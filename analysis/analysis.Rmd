@@ -472,7 +472,7 @@ data_moderator_meta <- data_processed %>%
   ungroup() %>%
   left_join(exclusion_rate_by_site, by = "data_collection_site") %>%
   dplyr::select(data_collection_site, hedges_g, hedges_g_se, exclude_aware_olsen_and_fazio) %>%  
-  arrange(exclude_aware_olsen_and_fazio)
+  arrange(desc(exclude_aware_olsen_and_fazio))
 
 fit_moderator <- 
   rma(yi   = hedges_g, 
@@ -482,7 +482,7 @@ fit_moderator <-
       slab = data_collection_site)
 
 forest(fit_moderator, 
-       ilab = round(data_moderator_meta$exclude_aware_olsen_and_fazio*100, 0),
+       ilab = round(data_moderator_meta$exclude_aware_olsen_and_fazio, 0),
        ilab.xpos = 1.3,
        ilab.pos = 2)
 
