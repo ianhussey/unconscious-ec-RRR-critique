@@ -1,0 +1,609 @@
+---
+title: "Unconscious EC RRR"
+subtitle: "Critical analysis"
+author: "Ian Hussey^[Ghent University. Email: ian.hussey@ugent.be]"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: haddock
+    number_sections: no
+    theme: flatly
+    toc: yes
+    toc_float: yes
+---
+
+# Points to discuss
+
+- We know EC is effective when aware. There should be differences between aware and unaware if the unaware criterion is functioning well. That isn't the case in the moderator metas using the original exclusion criterion, and only becomes the case when you use stricter criteria. This suggest that the original criterion doesn't function well to distinguish between aware an non-aware participants. 
+- The main article discusses differences in NHST outcomes between awareness criteria, but does not consider either (a) differences in the exclusion rate between criteria nor (b) agreement between the criteria. That is, no assessment was done of whether the criteria function as convergent measures of awareness or how they differ in strictness. Such an analysis, below, suggests that there is much disagreement between the criteria, and that the original criterion is by far the laxest criterion. This risks including many participants who were actually aware, providing a weak test of the hypothesis. 
+- The most sever test of the hypothesis is to exclude participants who were flagged as aware by any of the four criteria - i.e., to combine the criteria rather than choose among them. Given our large starting sample size, even high rates of exclusion provide good power to detect the effect in the remaining sample. Doing so produces a well estimated effect size of exceptionally close to zero, Hedges g = 0.00, 95% CI = [-0.11, 0.10], p = .983. 
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+
+# options
+options(knitr.table.format = "html") # necessary configuration of tables
+
+# disable scientific notation
+options(scipen = 999) 
+
+```
+
+# Data, dependencies & functions
+
+```{r}
+
+# Dependencies ----
+
+check_for_and_install_packages <- function(package) {
+  if (!package %in% installed.packages()) install.packages(package)
+}
+
+check_for_and_install_packages("tidyverse")
+check_for_and_install_packages("metafor")
+check_for_and_install_packages("knitr")
+check_for_and_install_packages("kableExtra")
+check_for_and_install_packages("diptest")
+if (!"patchwork" %in% installed.packages()) devtools::install_github("thomasp85/patchwork")
+
+library(tidyverse)
+library(metafor)
+library(knitr)
+library(kableExtra)
+library(patchwork)
+library(diptest)
+
+
+# Data ----
+
+data_processed <- read.csv("../../unconscious-ec-RRR/data/processed/data_processed.csv") %>%
+  mutate(data_collection_site = dplyr::recode(data_collection_site,
+                                              "Balas and Sarzynnska" = "Balas",
+                                              "Corneille and Mierop" = "Mierop",
+                                              "Gast Richter and Benedict" = "Gast",
+                                              "Gawronski" = "Gawronski",
+                                              "Hutter" = "Hütter",
+                                              "Kurdi and Ferguson" = "Kurdi",
+                                              "Moran Hussey and Hughes" = "Moran",
+                                              "Olsen and Fritzlen" = "Olson",
+                                              "Smith and Douglas" = "Douglas",
+                                              "Stahl Bading Aust Heycke and Thomasius" = "Stahl",
+                                              "Unkelbach and Hogden" = "Unkelbach",
+                                              "Vadillo" = "Vadillo")) %>%
+  filter(exclude_surveillance == FALSE & 
+           simulated_data == FALSE) %>%
+  mutate(exclude_all_four_combined = ifelse(exclude_aware_olsen_and_fazio +
+                                              exclude_aware_olsen_and_fazio_modified +
+                                              exclude_awareness_baranan_dehouwer_nosek +
+                                              exclude_awareness_baranan_dehouwer_nosek_modified > 0, 1, 0)) %>%
+  rename(DV = sum_score_evaluation_CSpos_preferred) %>%
+  dplyr::select(data_collection_site,
+                DV,
+                exclude_aware_olsen_and_fazio,
+                exclude_aware_olsen_and_fazio_modified,
+                exclude_awareness_baranan_dehouwer_nosek,
+                exclude_awareness_baranan_dehouwer_nosek_modified,
+                exclude_all_four_combined)
+
+data_combined_criteria <- data_processed %>%
+  filter(exclude_all_four_combined == FALSE)
+
+
+# Define functions ----
+
+# add heterogeneity metrics to metafor forest plot
+add_heterogeneity_metrics_to_forest <- function(fit) {
+  bquote(paste("RE Model (", 
+               italic('I')^"2", " = ", .(formatC(format(round(fit$I2, 1), nsmall = 1))),
+               "%, ", italic('H')^"2", " = ", .(formatC(format(round(fit$H2, 1), nsmall = 1))), ")"))
+}
+
+# function to round all numerics in a data frame
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
+}
+
+# apa format p value
+apa_p_value <- function(p){
+  p_formatted <- ifelse(p >= 0.001, paste("=", round(p, 3)),
+                        ifelse(p < 0.001, "< .001", NA))
+  p_formatted <- gsub(pattern = "0.", replacement = ".", x = p_formatted, fixed = TRUE)
+  p_formatted
+}
+
+# function to meta analyze proportions
+meta_analysis_proportions <- function(data){
+  
+  meta_data_1 <- escalc(measure = "PR", 
+                        xi = criterion, 
+                        ni = ni, 
+                        data = data)
+  
+  tmp <- t(sapply(split(meta_data_1, meta_data_1$data_collection_site), 
+                  function(x) binom.test(x$criterion, x$ni)$conf.int))
+  meta_data_1$ci.lb <- tmp[,1]
+  meta_data_1$ci.ub <- tmp[,2]
+  
+  fit <- rma.glmm(measure = "PLO", 
+                  xi = criterion, 
+                  ni = ni, 
+                  data = data, 
+                  slab = data_collection_site)
+  
+  return(fit)
+  
+}
+
+
+#' A priori power analysis for meta analysis  -----
+
+#' Estimation power for meta analysis of effects, using equations derived from Valentine, Pigott, & Rothstein (2010, doi: 10.3102/1076998609346961), derived by Quintana (2017: https://towardsdatascience.com/how-to-calculate-statistical-power-for-your-meta-analysis-e108ee586ae8)
+#' @param yi Meta-analyzed Cohen's d effect size. 
+#' @param ni The average number of data points per site
+#' @param k The number of sites
+#' @param tau2 The tau^2 metric of between site heterogeneity
+#' @return Statistical power (i.e., 1 - Beta): the probability of observing a significant result given the parameters. 
+
+power_meta <- function(yi, ni, k, tau2){
+  
+  eq1 <- ((ni + ni)/((ni)*(ni))) + ((yi^2)/(2*(ni + ni)))
+  eq2 <- tau2*(eq1)
+  eq3 <- eq2+eq1
+  eq4 <- eq3/k
+  eq5 <- (yi/sqrt(eq4))
+  power <- (1 - pnorm(1.96 - eq5)) # two-tailed
+  
+  return(power)
+}
+
+
+# meta analysis and forest plot workflow
+meta_analysis_workflow <- function(data, 
+                                   effect_size_label = "Hedges' g", 
+                                   reference_line = 0, 
+                                   plot = TRUE) {
+  
+  # calculate effect sizes for meta
+  # NB the original preregistered code used a bootstrapping method to calculate effect sizes, CIs, and SEIs. However, the unexpectedly small number of participants collected at some sites meant that results - particularly heterogeneity effect sizes - were relatively unstable across re-running the script. For the sake of computational reproducibility, I therefore exchange the bootstrapping method for the arithmetic method throughout. Sites with N <= 2 are then excluded so that ES can be calculated (see [link](https://www.meta-analysis.com/downloads/Meta-analysis%20Effect%20sizes%20based%20on%20means.pdf)).
+  data_effect_sizes <- data %>%
+    group_by(data_collection_site) %>%
+    dplyr::summarize(preference_mean = mean(DV),
+                     preference_sd = sd(DV),
+                     preference_n = n()) %>%
+    # must have greater than N=2 per site to calculate SD etc
+    filter(preference_n > 2) %>%
+    # calculate h and its SE
+    dplyr::mutate(preference_cohens_dz = preference_mean/preference_sd,
+                  cohens_dz_V = ((preference_n*2)/(preference_n^2)) +
+                    ((preference_cohens_dz^2) / (preference_n*4)),
+                  J = 1 - (3/(4*(preference_n-1)-1)),
+                  hedges_g = preference_cohens_dz * J,
+                  hedges_g_V = J^2 * cohens_dz_V,
+                  hedges_g_se = sqrt(hedges_g_V)) %>%
+    ungroup() %>%
+    dplyr::select(data_collection_site, hedges_g, hedges_g_se)
+  
+  # fit random effects model 
+  fitted_model <- 
+    rma(yi   = hedges_g, 
+        sei  = hedges_g_se,
+        data = data_effect_sizes,
+        slab = data_collection_site)
+  
+  p_value <- apa_p_value(fitted_model$pval)
+  
+  z_value <- fitted_model$zval
+  
+  # model predictions
+  meta_analysis_results <-
+    predict(fitted_model, digits = 5) %>%
+    as.data.frame() %>%
+    gather() %>%
+    round_df(2) %>%
+    dplyr::rename(metric = key,
+                  estimate = value) %>%
+    mutate(metric = dplyr::recode(metric,
+                                  "pred"  = paste("Meta analysed ", effect_size_label),
+                                  "ci.lb" = "95% CI lower",
+                                  "ci.ub" = "95% CI upper",
+                                  "cr.lb" = "95% CR lower",
+                                  "cr.ub" = "95% CR upper"))
+  
+  meta_analysis_results <- rbind(meta_analysis_results,
+                                 data.frame(metric = "p", estimate = p_value),
+                                 data.frame(metric = "z", estimate = z_value))
+  
+  # summarize results
+  meta_analysis_results_text <- 
+    paste0("k = ", fitted_model$k, ", ", 
+           effect_size_label, " = ", meta_analysis_results$estimate[1],
+           # dynamic indexing of some values as different models return variables in different locations, but relative location is reliable
+           ", 95% CI = [", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-5],  
+           ", ", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-4], 
+           "], 95% CR = [", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-3], 
+           ", ", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-2],
+           "], z = ", signif(as.numeric(as.character(meta_analysis_results$estimate[length(meta_analysis_results$estimate)])), digits = 3),
+           ", p ", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-1])
+  
+  heterogeneity_test_results_text <- 
+    paste0("Q(df = ",    fitted_model$k - 1, ") = ", round(fitted_model$QE, 2), 
+           ", p ",       apa_p_value(fitted_model$QEp),
+           ", tau^2 = ", round(fitted_model$tau2, 2), 
+           ", I^2 = ",   round(fitted_model$I2, 2),
+           ", H^2 = ",   round(fitted_model$H2, 2))
+  
+  # forest plot 
+  if (plot == TRUE) {
+    forest_plot <- metafor::forest(fitted_model,
+                                   xlab = effect_size_label,
+                                   addcred = TRUE,
+                                   refline = reference_line)
+  } else {
+    forest_plot <- NULL
+  }
+  
+  return(list(data_effect_sizes               = data_effect_sizes,
+              fitted_model                    = fitted_model, 
+              meta_analysis_results           = meta_analysis_results,
+              meta_analysis_results_text      = meta_analysis_results_text,
+              heterogeneity_test_results_text = heterogeneity_test_results_text,
+              plot                            = plot))
+  
+}
+
+```
+
+# Comparing awareness criteria 
+
+Awareness exclusion rates after doing surveillance exclusions. 
+
+## Incongruence between criteria
+
+```{r}
+
+results_incongruent_classification_rate <- data_processed %>%
+  count(exclude_aware_olsen_and_fazio_modified,
+        exclude_awareness_baranan_dehouwer_nosek_modified) %>%
+  mutate(congruent = exclude_aware_olsen_and_fazio_modified == exclude_awareness_baranan_dehouwer_nosek_modified) %>%
+  group_by(congruent) %>%
+  dplyr::summarize(n = sum(n)) %>%
+  ungroup() %>%
+  dplyr::mutate(percent = round(n/(n+lead(n))*100, 1)) %>%
+  pull(percent)
+
+```
+
+The criteria do not differ only in their strictness, but also the subsets of participants that they flag as aware. For example, `r results_incongruent_classification_rate[1]`% of participants receive incongruent awareness classifications between the O&F mod and BA,DH,N mod criteria - i.e., are classified by aware by one vs unaware by the other.
+
+As such, the most severe test of the hypothesis that EC can occur in the absence of awareness is to apply all four criteria, and exclude participants who are flagged as aware by any of the four awareness tests. 
+
+## Rates by criterion 
+
+```{r}
+
+data_processed %>%
+  select(-DV, -data_collection_site) %>%
+  summarize_all(.funs = mean) %>%
+  round_df(3) %>%
+  gather() %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
+
+## Rates by criterion and site
+
+```{r}
+
+# data_processed %>%
+#   select(-DV) %>%
+#   group_by(data_collection_site) %>%
+#   summarize_all(.funs = mean) %>%
+#   round_df(3) %>%
+#   kable() %>%
+#   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# means and sds of exclusion rates across sites
+exclusion_rate_by_site <- data_processed %>%
+  dplyr::select(-DV) %>%
+  group_by(data_collection_site) %>%
+  summarize_all(.funs = mean) %>%
+  ungroup()
+
+exclusion_rate_by_site %>%
+  round_df(3) %>%
+  gather(criterion, proportion, c(exclude_aware_olsen_and_fazio,
+                                  exclude_aware_olsen_and_fazio_modified,
+                                  exclude_awareness_baranan_dehouwer_nosek,
+                                  exclude_awareness_baranan_dehouwer_nosek_modified,
+                                  exclude_all_four_combined)) %>% 
+  group_by(criterion) %>%
+  dplyr::summarize(min_prop = min(proportion),
+                   max_prop = max(proportion)) %>%
+  round_df(3) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
+
+### Meta analyses of awareness rates
+
+```{r}
+
+n_by_site <- data_processed %>%
+  group_by(data_collection_site) %>%
+  dplyr::summarize(ni = n())
+
+exclusion_rate_by_site <- data_processed %>%
+  dplyr::select(-DV) %>%
+  group_by(data_collection_site) %>%
+  mutate_at(vars(-group_cols()), as.numeric) %>%
+  summarize_all(.funs = sum) %>%
+  ungroup() %>%
+  left_join(n_by_site, by = "data_collection_site")
+
+```
+
+#### Olson & Fazio criterion
+
+```{r}
+
+fit_awareness_rate_of <- exclusion_rate_by_site %>%
+  rename(criterion = exclude_aware_olsen_and_fazio) %>%
+  meta_analysis_proportions()
+
+#summary(fit_awareness_rate_of)
+
+forest(fit_awareness_rate_of, 
+       transf = transf.ilogit,
+       mlab = add_heterogeneity_metrics_to_forest(fit_awareness_rate_of),
+       xlim = c(-1, 1.5),
+       at = c(0, .2, .4, .6, .8, 1),
+       addcred = TRUE,
+       refline = NULL,
+       xlab = "Proportion of aware participants")
+text(-0.5, 14, "Olson & Fazio (2001) exclusions", pos = 4)
+text(0.7, 13.85, "Proportion [95% CI]", pos = 2)
+
+```
+
+#### Olson & Fazio modified criterion
+
+```{r}
+
+fit_awareness_rate_ofmod <- exclusion_rate_by_site %>%
+  rename(criterion = exclude_aware_olsen_and_fazio_modified) %>%
+  meta_analysis_proportions()
+
+#summary(fit_awareness_rate_ofmod)
+
+forest(fit_awareness_rate_ofmod, 
+       transf = transf.ilogit,
+       mlab = add_heterogeneity_metrics_to_forest(fit_awareness_rate_ofmod),
+       xlim = c(-1, 1.5),
+       at = c(0, .2, .4, .6, .8, 1),
+       addcred = TRUE,
+       refline = NULL,
+       xlab = "Proportion of aware participants")
+text(-1, 14, "Olson & Fazio (2001) modified exclusions", pos = 4)
+text(1.5, 13.85, "Proportion [95% CI]", pos = 2)
+
+```
+
+#### Bar-Anan et al criterion
+
+```{r}
+
+fit_awareness_rate_bdn <- exclusion_rate_by_site %>%
+  rename(criterion = exclude_awareness_baranan_dehouwer_nosek) %>%
+  meta_analysis_proportions()
+
+#summary(fit_awareness_rate_bdn)
+
+forest(fit_awareness_rate_bdn, 
+       transf = transf.ilogit,
+       mlab = add_heterogeneity_metrics_to_forest(fit_awareness_rate_bdn),
+       xlim = c(-1, 1.5),
+       at = c(0, .2, .4, .6, .8, 1),
+       addcred = TRUE,
+       refline = NULL,
+       xlab = "Proportion of aware participants")
+text(-1, 14, "Bar-Anan et al. (2010) exclusions", pos = 4)
+text(1.5, 13.85, "Proportion [95% CI]", pos = 2)
+
+```
+
+#### Bar-Anan et al modified criterion
+
+```{r}
+
+fit_awareness_rate_bdnmod <- exclusion_rate_by_site %>%
+  rename(criterion = exclude_awareness_baranan_dehouwer_nosek_modified) %>%
+  meta_analysis_proportions()
+
+#summary(fit_awareness_rate_bdnmod)
+
+forest(fit_awareness_rate_bdnmod, 
+       transf = transf.ilogit,
+       mlab = add_heterogeneity_metrics_to_forest(fit_awareness_rate_bdnmod),
+       xlim = c(-1, 1.5),
+       at = c(0, .2, .4, .6, .8, 1),
+       addcred = TRUE,
+       refline = NULL,
+       xlab = "Proportion of aware participants")
+text(-1, 14, "Bar-Anan et al. (2010) modified exclusions", pos = 4)
+text(1.5, 13.85, "Proportion [95% CI]", pos = 2)
+
+```
+
+#### Summary
+
+For each awareness criterion, the proportion of participants at each site that were labelled as demonstrating awareness was calculated and subjected to a meta analysis of proprortion. Results suggested that the variation in exclusion rates between sites represented a large degree of between-site heterogeneity rather than merely sampling variation (across exclusion criteria, all I2 = 54.7% to 91.7%, all H2 = 2.2 to 12). This may suggest that the awareness exclusion criteria were not functioning equivalently as measures of awareness between sites. This seems plausible given that participants' open ended responses were hand scored by researchers, making scores far from objective. 
+
+# Meta analysis of EC effect: all participants with awareness rate as moderator
+
+We conducted a meta analysis to test the idea that the presence of EC effects was driven by participants in the sample who were actually aware, who were not excluded due to the lax and somewhat subjective awareness criterion.
+
+This model employed all participants, both aware and unaware (i.e., N = `r nrow(data_processed)`. Effect sizes were again calculated for each site, as well as the awareness rate using the confirmatory Olson and Fazio (2001) criterion. The meta analysis model was therefore identical to that employed in the confirmatory analyis in the RRR, other than one addition: it included site awareness rate as a moderator.
+
+```{r}
+
+data_moderator_meta <- data_processed %>% 
+  group_by(data_collection_site) %>%
+  dplyr::summarize(preference_mean = mean(DV),
+                   preference_sd = sd(DV),
+                   preference_n = n()) %>%
+  # must have greater than N=2 per site to calculate SD etc
+  filter(preference_n > 2) %>%
+  # calculate h and its SE
+  dplyr::mutate(preference_cohens_dz = preference_mean/preference_sd,
+                cohens_dz_V = ((preference_n*2)/(preference_n^2)) +
+                  ((preference_cohens_dz^2) / (preference_n*4)),
+                J = 1 - (3/(4*(preference_n-1)-1)),
+                hedges_g = preference_cohens_dz * J,
+                hedges_g_V = J^2 * cohens_dz_V,
+                hedges_g_se = sqrt(hedges_g_V)) %>%
+  ungroup() %>%
+  left_join(exclusion_rate_by_site, by = "data_collection_site") %>%
+  dplyr::select(data_collection_site, hedges_g, hedges_g_se, exclude_aware_olsen_and_fazio) %>%  
+  arrange(exclude_aware_olsen_and_fazio)
+
+fit_moderator <- 
+  rma(yi   = hedges_g, 
+      sei  = hedges_g_se,
+      mod  = ~exclude_aware_olsen_and_fazio,
+      data = data_moderator_meta,
+      slab = data_collection_site)
+
+forest(fit_moderator, 
+       ilab = round(data_moderator_meta$exclude_aware_olsen_and_fazio*100, 0),
+       ilab.xpos = 1.3,
+       ilab.pos = 2)
+
+summary(fit_moderator)
+
+```
+
+Results demonstrated that the model intercept - i.e., the estimate of the EC effect if awareness rates in the sample were statistically controlled for to 0 - was Hedges' g = -0.02, 95% CI [-0.35, 0.31]. That is, when including aware participants in the sample but controlling for the rate of awareness between sites, the meta effect size estimate remained to be non-significant and close to zero. These results support the idea that (1) the observed heterogeneity in awareness rates between sites may be due to the somewhat subject nature of the awareness scoring criteria, and therefore (2) the presence of significant meta effect size in the original confirmatory analysis was due to the failure of this criteria to strictly exclude aware participants.
+
+# Sensitivity power analysis
+
+The key verbal hypothesis being tested here is whether participants can demonstrate a change in liking due to the pairing of stimuli (i.e., EC), when those pairing occur without awareness. 
+
+Given that EC is uncontroversially known to occur within awareness, the test of this hypothesis relies on the successful exclusion of participants demonstating awareness. Should we fail to exclude individuals who are in fact aware, a traditional EC effect may be demonstrated at the group level, driven by those aware participants.  
+
+The analyses above suggest that the four awareness criteria used in the original RRR are noisey measures of awareness - both between criteria and between data collection sites. Furthermore, the criterion used for the "confirmatory" analysis within the RRR was the laxest criterion, excluding only XX% of participants where others excluded up to XX%. It is therefore notable that a significant effect was found only when using this lax criterion. We suggest that there is great risk that this effect was driven by the subset of participants who were scored as unaware but who in fact were aware.
+
+We therefore suggest a minor modification of the original analysis that provides a severe test of the verbal hypothesis: that particiapnts be scored as aware if *any* of the four criteria flag them as aware, and excluded from the meta analysis.
+
+Before conduciting such an analysis, it is useful to first consider what power such an analysis would have given an increased exclusion rate. 
+
+Using data at hand after combined exclusions, what effect size can be detected?
+
+```{r}
+
+n_participants <- data_combined_criteria %>%
+  select(DV, data_collection_site) %>%
+  count() %>%
+  pull(n)
+
+k_sites <- data_combined_criteria %>%
+  distinct(data_collection_site) %>%
+  count() %>%
+  pull(n)
+
+```
+
+N after combined exclusions = `r n_participants`, k sites = `r k_sites`.
+
+## Method reported in manuscript 
+
+"within subjects [t test], one-tailed, alpha = 0.05)"
+
+```{r eval=FALSE, include=TRUE}
+
+# meta effect size from published literature
+pwr.t.test(d = 0.20,   # CHANGED
+           n = n_participants, 
+           sig.level = 0.05, 
+           type = "paired", 
+           alternative = "greater")
+# >power = 0.9997737
+
+# min es with power >= .99
+pwr.t.test(d = 0.16,   # CHANGED
+           n = n_participants, 
+           sig.level = 0.05, 
+           type = "paired", 
+           alternative = "greater")
+# >power = 0.9933745
+
+# min es with power >= .80
+pwr.t.test(d = 0.10,    # CHANGED
+           n = n_participants,
+           sig.level = 0.05, 
+           type = "paired", 
+           alternative = "greater")
+# >power = 0.8241449
+
+```
+
+- At d = .20, the meta effect size from published literature, >99% power to detect this effect
+- At 99% power criterion, detectable d = .16 
+- At 80% power criterion, detectable d = .10
+
+## For multi-level model
+
+Heterogeneity tau2 set to 0 given results from preregistered meta analyses using other exclusion criteria. 
+
+```{r eval=FALSE, include=TRUE}
+
+# each of the below returns power estimate. yi was tuned for each to find criterion power values. yi values then reported below.
+
+# meta effect size from published literature
+power_meta(yi = 0.2, 
+           ni = n_participants/k_sites,
+           k  = k_sites,
+           tau2 = 0.0)
+
+# 99% power 
+power_meta(yi = 0.24, # criterion effect size
+           ni = n_participants/k_sites,  # average n per site
+           k  = k_sites,  # k sites
+           tau2 = 0.0)  # heterogeneity
+
+# 80% power 
+power_meta(yi = 0.16, 
+           ni = n_participants/k_sites,
+           k  = k_sites,
+           tau2 = 0.0)
+
+```
+
+- At d = .20, the meta effect size from published literature, 95% power to detect this effect
+- At 99% power criterion, detectable meta d = .24
+- At 80% power criterion, detectable meta d = .16
+
+# Meta analysis: combined exclusion criterion
+
+```{r}
+
+results_combined_criteria <- meta_analysis_workflow(data_combined_criteria)
+
+```
+
+- Meta anaysis results: `r results_combined_criteria$meta_analysis_results_text`
+- Heterogeneity tests: `r results_combined_criteria$heterogeneity_test_results_text`
+
+
+
+
+
+
+
