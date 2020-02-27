@@ -13,12 +13,6 @@ output:
     toc_float: yes
 ---
 
-# Points to discuss
-
-- We know EC is effective when aware. There should be differences between aware and unaware if the unaware criterion is functioning well. That isn't the case in the moderator metas using the original exclusion criterion, and only becomes the case when you use stricter criteria. This suggest that the original criterion doesn't function well to distinguish between aware an non-aware participants. 
-- The main article discusses differences in NHST outcomes between awareness criteria, but does not consider either (a) differences in the exclusion rate between criteria nor (b) agreement between the criteria. That is, no assessment was done of whether the criteria function as convergent measures of awareness or how they differ in strictness. Such an analysis, below, suggests that there is much disagreement between the criteria, and that the original criterion is by far the laxest criterion. This risks including many participants who were actually aware, providing a weak test of the hypothesis. 
-- The most sever test of the hypothesis is to exclude participants who were flagged as aware by any of the four criteria - i.e., to combine the criteria rather than choose among them. Given our large starting sample size, even high rates of exclusion provide good power to detect the effect in the remaining sample. Doing so produces a well estimated effect size of exceptionally close to zero, Hedges g = 0.00, 95% CI = [-0.11, 0.10], p = .983. 
-
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(echo = TRUE, 
@@ -620,9 +614,13 @@ pwr.t.test(d = 0.10,    # CHANGED
 - At 99% power criterion, detectable d = .16 
 - At 80% power criterion, detectable d = .10
 
+While I report this method for the sake of parity with the method reported in Moran et al., I disagree with several aspects of this analysis. First, statistical power is a property of a given hypothesis test method, and the test used in both Moran et al and here is meta analytic effect size (i.e., which involves a random effect for site). This power analysis does not involve this random effect - ie it is a power analysis for a different test, and it is unclear the degree to which it is informative for the hypothesis test that was actually run, both in Moran et al. and here. Even putting this aside, other issues are also apparently present: 1) the power analysis employed in Moran et al was stated to be a within subjects effect size, but the study design actually used a one-sample test; 2) the power analysis was stated to be one-sided with alpha = 0.05, but the hypothesis test uses two-sided with alpha = 0.05 (i.e., equivalent to one-sided with alpha = 0.10). In light of these issues, I also conducted what appeared to be a more appropriate power analysis, below.
+
 ## For multi-level model
 
-Heterogeneity tau2 set to 0 given results from preregistered meta analyses using other exclusion criteria. 
+In addition, we also considered a different form of power analysis that acknowledged the hierarchical structure among the data given the multi-site design. 
+
+Heterogeneity tau2 set to 0 given results from preregistered meta analyses using other exclusion criteria. Alpha = 0.05, two-sided.
 
 ```{r eval=FALSE, include=TRUE}
 

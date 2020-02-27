@@ -11,7 +11,7 @@
 
 <meta name="author" content="Ian Hussey" />
 
-<meta name="date" content="2020-02-27" />
+<meta name="date" content="2020-02-28" />
 
 <title>Unconscious EC RRR</title>
 
@@ -1672,19 +1672,11 @@ div.tocify {
 <h1 class="title toc-ignore">Unconscious EC RRR</h1>
 <h3 class="subtitle">Critical analysis</h3>
 <h4 class="author">Ian Hussey<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></h4>
-<h4 class="date">27 February 2020</h4>
+<h4 class="date">28 February 2020</h4>
 
 </div>
 
 
-<div id="points-to-discuss" class="section level1">
-<h1>Points to discuss</h1>
-<ul>
-<li>We know EC is effective when aware. There should be differences between aware and unaware if the unaware criterion is functioning well. That isn’t the case in the moderator metas using the original exclusion criterion, and only becomes the case when you use stricter criteria. This suggest that the original criterion doesn’t function well to distinguish between aware an non-aware participants.</li>
-<li>The main article discusses differences in NHST outcomes between awareness criteria, but does not consider either (a) differences in the exclusion rate between criteria nor (b) agreement between the criteria. That is, no assessment was done of whether the criteria function as convergent measures of awareness or how they differ in strictness. Such an analysis, below, suggests that there is much disagreement between the criteria, and that the original criterion is by far the laxest criterion. This risks including many participants who were actually aware, providing a weak test of the hypothesis.</li>
-<li>The most sever test of the hypothesis is to exclude participants who were flagged as aware by any of the four criteria - i.e., to combine the criteria rather than choose among them. Given our large starting sample size, even high rates of exclusion provide good power to detect the effect in the remaining sample. Doing so produces a well estimated effect size of exceptionally close to zero, Hedges g = 0.00, 95% CI = [-0.11, 0.10], p = .983.</li>
-</ul>
-</div>
 <div id="data-dependencies-functions" class="section level1">
 <h1>Data, dependencies &amp; functions</h1>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb1-1" data-line-number="1"><span class="co"># Dependencies ----</span></a>
@@ -2399,10 +2391,12 @@ exclude_awareness_baranan_dehouwer_nosek_modified
 <li>At 99% power criterion, detectable d = .16</li>
 <li>At 80% power criterion, detectable d = .10</li>
 </ul>
+<p>While I report this method for the sake of parity with the method reported in Moran et al., I disagree with several aspects of this analysis. First, statistical power is a property of a given hypothesis test method, and the test used in both Moran et al and here is meta analytic effect size (i.e., which involves a random effect for site). This power analysis does not involve this random effect - ie it is a power analysis for a different test, and it is unclear the degree to which it is informative for the hypothesis test that was actually run, both in Moran et al. and here. Even putting this aside, other issues are also apparently present: 1) the power analysis employed in Moran et al was stated to be a within subjects effect size, but the study design actually used a one-sample test; 2) the power analysis was stated to be one-sided with alpha = 0.05, but the hypothesis test uses two-sided with alpha = 0.05 (i.e., equivalent to one-sided with alpha = 0.10). In light of these issues, I also conducted what appeared to be a more appropriate power analysis, below.</p>
 </div>
 <div id="for-multi-level-model" class="section level2">
 <h2>For multi-level model</h2>
-<p>Heterogeneity tau2 set to 0 given results from preregistered meta analyses using other exclusion criteria.</p>
+<p>In addition, we also considered a different form of power analysis that acknowledged the hierarchical structure among the data given the multi-site design.</p>
+<p>Heterogeneity tau2 set to 0 given results from preregistered meta analyses using other exclusion criteria. Alpha = 0.05, two-sided.</p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb16-1" data-line-number="1"><span class="co"># each of the below returns power estimate. yi was tuned for each to find criterion power values. yi values then reported below.</span></a>
 <a class="sourceLine" id="cb16-2" data-line-number="2"></a>
 <a class="sourceLine" id="cb16-3" data-line-number="3"><span class="co"># meta effect size from published literature</span></a>
