@@ -95,6 +95,52 @@ data_combined_criteria <- data_processed %>%
 
 # Define functions ----
 
+# helper function to calculate G scores for each bootstrap resample
+bootstrap_helper_function <- function(split, ...) {
+  
+  require(dplyr)
+  
+  results <- analysis(split) %>%
+    gather(item, response, c(-id)) %>%
+    arrange(id) %>%
+    group_by(id) %>%
+    mutate(guttman_error = ifelse(dplyr::lag(response) < response, 1, 0)) %>%
+    dplyr::summarize(guttman_error_boolean = max(guttman_error, na.rm = TRUE)) %>%
+    ungroup() %>%
+    dplyr::summarize(G = sum(guttman_error_boolean, na.rm = TRUE)/n()) %>%
+    gather(metric, estimate)
+  
+  return(results)
+  
+}
+
+
+# function to bootstrap G values
+bootstrap_guttman_errors <- function(data, n.iter = 2000, ...){
+  
+  require(timesavers)
+  require(dplyr)
+  require(purrr)
+  require(rsample)
+  
+  # create bootstraps
+  bootstraps <- data %>%
+    rownames_to_column(var = "id") %>%
+    bootstraps(times = n.iter)
+  
+  ## apply to each bootstrap, then summarize across them
+  results_bootstrapped_guttman_errors <- bootstraps %>% 
+    mutate(bootstrapped_results = map(splits, bootstrap_helper_function)) %>% 
+    unnest(bootstrapped_results) %>% 
+    group_by(metric) %>%
+    dplyr::summarize(median = quantile(estimate, 0.500),
+                     ci_lwr = quantile(estimate, 0.025),
+                     ci_upr = quantile(estimate, 0.975))
+  
+  return(results_bootstrapped_guttman_errors)
+  
+}
+
 # add heterogeneity metrics to metafor forest plot
 add_heterogeneity_metrics_to_forest <- function(fit) {
   bquote(paste("RE Model (", 
@@ -282,6 +328,22 @@ results_incongruent_classification_rate <- data_processed %>%
 The criteria do not differ only in their strictness, but also the subsets of participants that they flag as aware. For example, `r results_incongruent_classification_rate[1]`% of participants receive incongruent awareness classifications between the O&F mod and BA,DH,N mod criteria - i.e., are classified by aware by one vs unaware by the other.
 
 As such, the most severe test of the hypothesis that EC can occur in the absence of awareness is to apply all four criteria, and exclude participants who are flagged as aware by any of the four awareness tests. 
+
+## Guttman errors
+
+```{r}
+
+# results_guttman_errors <- bootstrap_guttman_errors(data_trimmed)
+# save(results_guttman_errors, file = "models/results_guttman_errors.RData")
+load("models/results_guttman_errors.RData")
+
+# print
+results_guttman_errors %>%
+  round_df(3) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
 
 ## Rates by criterion 
 
