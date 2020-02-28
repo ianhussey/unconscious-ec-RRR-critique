@@ -1750,17 +1750,17 @@ div.tocify {
 <a class="sourceLine" id="cb1-69" data-line-number="69"><span class="st">    dplyr::summarize(guttman_error_boolean = max(guttman_error, na.rm = TRUE)) %&gt;%</span></a>
 <a class="sourceLine" id="cb1-70" data-line-number="70"><span class="st">    ungroup() %&gt;%</span></a>
 <a class="sourceLine" id="cb1-71" data-line-number="71"><span class="st">    dplyr::summarize(G = sum(guttman_error_boolean, na.rm = TRUE)/n()) %&gt;%</span></a>
-<a class="sourceLine" id="cb1-72" data-line-number="72"><span class="st">    gather(metric, estimate)</span></a>
-<a class="sourceLine" id="cb1-73" data-line-number="73"><span class="st">  </span></a>
-<a class="sourceLine" id="cb1-74" data-line-number="74"><span class="st">  return(results)</span></a>
-<a class="sourceLine" id="cb1-75" data-line-number="75"><span class="st">  </span></a>
-<a class="sourceLine" id="cb1-76" data-line-number="76"><span class="st">}</span></a>
-<a class="sourceLine" id="cb1-77" data-line-number="77"></a>
+<a class="sourceLine" id="cb1-72" data-line-number="72"><span class="st">    mutate(`G*` = G/(ncol(analysis(split)) - 1)) %&gt;% # normalized by the number of variables</span></a>
+<a class="sourceLine" id="cb1-73" data-line-number="73"><span class="st">    gather(metric, estimate)</span></a>
+<a class="sourceLine" id="cb1-74" data-line-number="74"><span class="st">  </span></a>
+<a class="sourceLine" id="cb1-75" data-line-number="75"><span class="st">  return(results)</span></a>
+<a class="sourceLine" id="cb1-76" data-line-number="76"><span class="st">  </span></a>
+<a class="sourceLine" id="cb1-77" data-line-number="77"><span class="st">}</span></a>
 <a class="sourceLine" id="cb1-78" data-line-number="78"></a>
-<a class="sourceLine" id="cb1-79" data-line-number="79"><span class="st"># function to bootstrap G values</span></a>
-<a class="sourceLine" id="cb1-80" data-line-number="80"><span class="st">bootstrap_guttman_errors &lt;- function(data, n.iter = 2000, ...){</span></a>
-<a class="sourceLine" id="cb1-81" data-line-number="81"><span class="st">  </span></a>
-<a class="sourceLine" id="cb1-82" data-line-number="82"><span class="st">  require(timesavers)</span></a>
+<a class="sourceLine" id="cb1-79" data-line-number="79"></a>
+<a class="sourceLine" id="cb1-80" data-line-number="80"><span class="st"># function to bootstrap G values</span></a>
+<a class="sourceLine" id="cb1-81" data-line-number="81"><span class="st">bootstrap_guttman_errors &lt;- function(data, n.iter = 2000, ...){</span></a>
+<a class="sourceLine" id="cb1-82" data-line-number="82"><span class="st">  </span></a>
 <a class="sourceLine" id="cb1-83" data-line-number="83"><span class="st">  require(dplyr)</span></a>
 <a class="sourceLine" id="cb1-84" data-line-number="84"><span class="st">  require(purrr)</span></a>
 <a class="sourceLine" id="cb1-85" data-line-number="85"><span class="st">  require(rsample)</span></a>
@@ -1948,31 +1948,109 @@ div.tocify {
 <div id="comparing-awareness-criteria" class="section level1">
 <h1>Comparing awareness criteria</h1>
 <p>Awareness exclusion rates after doing surveillance exclusions.</p>
+<div id="rates-by-criterion" class="section level2">
+<h2>Rates by criterion</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" data-line-number="1">data_processed <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-2" data-line-number="2"><span class="st">  </span><span class="kw">select</span>(exclude_aware_olsen_and_fazio, </a>
+<a class="sourceLine" id="cb2-3" data-line-number="3">         exclude_aware_olsen_and_fazio_modified, </a>
+<a class="sourceLine" id="cb2-4" data-line-number="4">         exclude_awareness_baranan_dehouwer_nosek, </a>
+<a class="sourceLine" id="cb2-5" data-line-number="5">         exclude_awareness_baranan_dehouwer_nosek_modified,</a>
+<a class="sourceLine" id="cb2-6" data-line-number="6">         exclude_all_four_combined) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="st">  </span><span class="kw">summarize_all</span>(<span class="dt">.funs =</span> mean) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-8" data-line-number="8"><span class="st">  </span><span class="kw">round_df</span>(<span class="dv">3</span>) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-9" data-line-number="9"><span class="st">  </span><span class="kw">gather</span>() <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-10" data-line-number="10"><span class="st">  </span><span class="kw">arrange</span>(value) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-11" data-line-number="11"><span class="st">  </span><span class="kw">kable</span>() <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb2-12" data-line-number="12"><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="kw">c</span>(<span class="st">&quot;striped&quot;</span>, <span class="st">&quot;hover&quot;</span>, <span class="st">&quot;condensed&quot;</span>), <span class="dt">full_width =</span> <span class="ot">FALSE</span>)</a></code></pre></div>
+<table class="table table-striped table-hover table-condensed" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;">
+key
+</th>
+<th style="text-align:right;">
+value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+exclude_aware_olsen_and_fazio
+</td>
+<td style="text-align:right;">
+0.076
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+exclude_awareness_baranan_dehouwer_nosek_modified
+</td>
+<td style="text-align:right;">
+0.269
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+exclude_aware_olsen_and_fazio_modified
+</td>
+<td style="text-align:right;">
+0.306
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+exclude_awareness_baranan_dehouwer_nosek
+</td>
+<td style="text-align:right;">
+0.479
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+exclude_all_four_combined
+</td>
+<td style="text-align:right;">
+0.541
+</td>
+</tr>
+</tbody>
+</table>
+</div>
 <div id="incongruence-between-criteria" class="section level2">
 <h2>Incongruence between criteria</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" data-line-number="1">results_incongruent_classification_rate &lt;-<span class="st"> </span>data_processed <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-2" data-line-number="2"><span class="st">  </span><span class="kw">count</span>(exclude_aware_olsen_and_fazio_modified,</a>
-<a class="sourceLine" id="cb2-3" data-line-number="3">        exclude_awareness_baranan_dehouwer_nosek_modified) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-4" data-line-number="4"><span class="st">  </span><span class="kw">mutate</span>(<span class="dt">congruent =</span> exclude_aware_olsen_and_fazio_modified <span class="op">==</span><span class="st"> </span>exclude_awareness_baranan_dehouwer_nosek_modified) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-5" data-line-number="5"><span class="st">  </span><span class="kw">group_by</span>(congruent) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-6" data-line-number="6"><span class="st">  </span>dplyr<span class="op">::</span><span class="kw">summarize</span>(<span class="dt">n =</span> <span class="kw">sum</span>(n)) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="st">  </span><span class="kw">ungroup</span>() <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-8" data-line-number="8"><span class="st">  </span>dplyr<span class="op">::</span><span class="kw">mutate</span>(<span class="dt">percent =</span> <span class="kw">round</span>(n<span class="op">/</span>(n<span class="op">+</span><span class="kw">lead</span>(n))<span class="op">*</span><span class="dv">100</span>, <span class="dv">1</span>)) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb2-9" data-line-number="9"><span class="st">  </span><span class="kw">pull</span>(percent)</a></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb3-1" data-line-number="1">results_incongruent_classification_rate &lt;-<span class="st"> </span>data_processed <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="st">  </span><span class="kw">count</span>(exclude_aware_olsen_and_fazio_modified,</a>
+<a class="sourceLine" id="cb3-3" data-line-number="3">        exclude_awareness_baranan_dehouwer_nosek_modified) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-4" data-line-number="4"><span class="st">  </span><span class="kw">mutate</span>(<span class="dt">congruent =</span> exclude_aware_olsen_and_fazio_modified <span class="op">==</span><span class="st"> </span>exclude_awareness_baranan_dehouwer_nosek_modified) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-5" data-line-number="5"><span class="st">  </span><span class="kw">group_by</span>(congruent) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-6" data-line-number="6"><span class="st">  </span>dplyr<span class="op">::</span><span class="kw">summarize</span>(<span class="dt">n =</span> <span class="kw">sum</span>(n)) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="st">  </span><span class="kw">ungroup</span>() <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="st">  </span>dplyr<span class="op">::</span><span class="kw">mutate</span>(<span class="dt">percent =</span> <span class="kw">round</span>(n<span class="op">/</span>(n<span class="op">+</span><span class="kw">lead</span>(n))<span class="op">*</span><span class="dv">100</span>, <span class="dv">1</span>)) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="st">  </span><span class="kw">pull</span>(percent)</a></code></pre></div>
 <p>The criteria do not differ only in their strictness, but also the subsets of participants that they flag as aware. For example, 20.8% of participants receive incongruent awareness classifications between the O&amp;F mod and BA,DH,N mod criteria - i.e., are classified by aware by one vs unaware by the other.</p>
 <p>As such, the most severe test of the hypothesis that EC can occur in the absence of awareness is to apply all four criteria, and exclude participants who are flagged as aware by any of the four awareness tests.</p>
-</div>
-<div id="guttman-errors" class="section level2">
-<h2>Guttman errors</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb3-1" data-line-number="1"><span class="co"># results_guttman_errors &lt;- bootstrap_guttman_errors(data_trimmed)</span></a>
-<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="co"># save(results_guttman_errors, file = &quot;models/results_guttman_errors.RData&quot;)</span></a>
-<a class="sourceLine" id="cb3-3" data-line-number="3"><span class="kw">load</span>(<span class="st">&quot;models/results_guttman_errors.RData&quot;</span>)</a>
-<a class="sourceLine" id="cb3-4" data-line-number="4"></a>
-<a class="sourceLine" id="cb3-5" data-line-number="5"><span class="co"># print</span></a>
-<a class="sourceLine" id="cb3-6" data-line-number="6">results_guttman_errors <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="st">  </span><span class="kw">round_df</span>(<span class="dv">3</span>) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="st">  </span><span class="kw">kable</span>() <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="kw">c</span>(<span class="st">&quot;striped&quot;</span>, <span class="st">&quot;hover&quot;</span>, <span class="st">&quot;condensed&quot;</span>), <span class="dt">full_width =</span> <span class="ot">FALSE</span>)</a></code></pre></div>
+<div id="guttman-errors" class="section level3">
+<h3>Guttman errors</h3>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="co"># results run and saved to disk, as execution time is about 2 minutes</span></a>
+<a class="sourceLine" id="cb4-2" data-line-number="2"></a>
+<a class="sourceLine" id="cb4-3" data-line-number="3"><span class="co"># </span><span class="al">NOTE</span><span class="co"> THAT THE SELECT CALL MUST ORDER THE COLUMNS IN ASCENDING ORDER OF MEAN AWARENESS EXCLUSION RATE, AS TAKEN FROM THE ABOVE PRINTED TABLE, FOR THE ANALYSIS TO BE RUN APPROPRIATELY</span></a>
+<a class="sourceLine" id="cb4-4" data-line-number="4"></a>
+<a class="sourceLine" id="cb4-5" data-line-number="5"><span class="co"># results_guttman_errors &lt;- data_processed %&gt;%</span></a>
+<a class="sourceLine" id="cb4-6" data-line-number="6"><span class="co">#   select(exclude_aware_olsen_and_fazio,</span></a>
+<a class="sourceLine" id="cb4-7" data-line-number="7"><span class="co">#          exclude_awareness_baranan_dehouwer_nosek_modified,</span></a>
+<a class="sourceLine" id="cb4-8" data-line-number="8"><span class="co">#          exclude_aware_olsen_and_fazio_modified,</span></a>
+<a class="sourceLine" id="cb4-9" data-line-number="9"><span class="co">#          exclude_awareness_baranan_dehouwer_nosek) %&gt;%</span></a>
+<a class="sourceLine" id="cb4-10" data-line-number="10"><span class="co">#   bootstrap_guttman_errors()</span></a>
+<a class="sourceLine" id="cb4-11" data-line-number="11"><span class="co">#  </span></a>
+<a class="sourceLine" id="cb4-12" data-line-number="12"><span class="co"># save(results_guttman_errors, file = &quot;models/results_guttman_errors.RData&quot;)</span></a>
+<a class="sourceLine" id="cb4-13" data-line-number="13"><span class="kw">load</span>(<span class="st">&quot;models/results_guttman_errors.RData&quot;</span>)</a>
+<a class="sourceLine" id="cb4-14" data-line-number="14"></a>
+<a class="sourceLine" id="cb4-15" data-line-number="15"><span class="co"># print</span></a>
+<a class="sourceLine" id="cb4-16" data-line-number="16">results_guttman_errors <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb4-17" data-line-number="17"><span class="st">  </span><span class="kw">round_df</span>(<span class="dv">3</span>) <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb4-18" data-line-number="18"><span class="st">  </span><span class="kw">kable</span>() <span class="op">%&gt;%</span></a>
+<a class="sourceLine" id="cb4-19" data-line-number="19"><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="kw">c</span>(<span class="st">&quot;striped&quot;</span>, <span class="st">&quot;hover&quot;</span>, <span class="st">&quot;condensed&quot;</span>), <span class="dt">full_width =</span> <span class="ot">FALSE</span>)</a></code></pre></div>
 <table class="table table-striped table-hover table-condensed" style="width: auto !important; margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
@@ -1996,81 +2074,32 @@ ci_upr
 G
 </td>
 <td style="text-align:right;">
-0.272
+0.475
 </td>
 <td style="text-align:right;">
-0.255
+0.455
 </td>
 <td style="text-align:right;">
-0.289
+0.495
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+G*
+</td>
+<td style="text-align:right;">
+0.119
+</td>
+<td style="text-align:right;">
+0.114
+</td>
+<td style="text-align:right;">
+0.124
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div id="rates-by-criterion" class="section level2">
-<h2>Rates by criterion</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb4-1" data-line-number="1">data_processed <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="st">  </span><span class="kw">select</span>(<span class="op">-</span>DV, <span class="op">-</span>data_collection_site) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb4-3" data-line-number="3"><span class="st">  </span><span class="kw">summarize_all</span>(<span class="dt">.funs =</span> mean) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb4-4" data-line-number="4"><span class="st">  </span><span class="kw">round_df</span>(<span class="dv">3</span>) <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb4-5" data-line-number="5"><span class="st">  </span><span class="kw">gather</span>() <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb4-6" data-line-number="6"><span class="st">  </span><span class="kw">kable</span>() <span class="op">%&gt;%</span></a>
-<a class="sourceLine" id="cb4-7" data-line-number="7"><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="kw">c</span>(<span class="st">&quot;striped&quot;</span>, <span class="st">&quot;hover&quot;</span>, <span class="st">&quot;condensed&quot;</span>), <span class="dt">full_width =</span> <span class="ot">FALSE</span>)</a></code></pre></div>
-<table class="table table-striped table-hover table-condensed" style="width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:left;">
-key
-</th>
-<th style="text-align:right;">
-value
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left;">
-exclude_aware_olsen_and_fazio
-</td>
-<td style="text-align:right;">
-0.076
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-exclude_aware_olsen_and_fazio_modified
-</td>
-<td style="text-align:right;">
-0.306
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-exclude_awareness_baranan_dehouwer_nosek
-</td>
-<td style="text-align:right;">
-0.479
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-exclude_awareness_baranan_dehouwer_nosek_modified
-</td>
-<td style="text-align:right;">
-0.269
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-exclude_all_four_combined
-</td>
-<td style="text-align:right;">
-0.541
-</td>
-</tr>
-</tbody>
-</table>
 </div>
 <div id="rates-by-criterion-and-site" class="section level2">
 <h2>Rates by criterion and site</h2>

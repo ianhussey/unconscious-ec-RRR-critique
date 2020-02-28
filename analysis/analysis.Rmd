@@ -102,6 +102,7 @@ bootstrap_helper_function <- function(split, ...) {
     dplyr::summarize(guttman_error_boolean = max(guttman_error, na.rm = TRUE)) %>%
     ungroup() %>%
     dplyr::summarize(G = sum(guttman_error_boolean, na.rm = TRUE)/n()) %>%
+    mutate(`G*` = G/(ncol(analysis(split)) - 1)) %>% # normalized by the number of variables
     gather(metric, estimate)
   
   return(results)
@@ -112,7 +113,6 @@ bootstrap_helper_function <- function(split, ...) {
 # function to bootstrap G values
 bootstrap_guttman_errors <- function(data, n.iter = 2000, ...){
   
-  require(timesavers)
   require(dplyr)
   require(purrr)
   require(rsample)
@@ -303,6 +303,25 @@ meta_analysis_workflow <- function(data,
 
 Awareness exclusion rates after doing surveillance exclusions. 
 
+## Rates by criterion 
+
+```{r}
+
+data_processed %>%
+  select(exclude_aware_olsen_and_fazio, 
+         exclude_aware_olsen_and_fazio_modified, 
+         exclude_awareness_baranan_dehouwer_nosek, 
+         exclude_awareness_baranan_dehouwer_nosek_modified,
+         exclude_all_four_combined) %>%
+  summarize_all(.funs = mean) %>%
+  round_df(3) %>%
+  gather() %>%
+  arrange(value) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
+
 ## Incongruence between criteria
 
 ```{r}
@@ -323,31 +342,27 @@ The criteria do not differ only in their strictness, but also the subsets of par
 
 As such, the most severe test of the hypothesis that EC can occur in the absence of awareness is to apply all four criteria, and exclude participants who are flagged as aware by any of the four awareness tests. 
 
-## Guttman errors
+### Guttman errors
 
 ```{r}
 
-# results_guttman_errors <- bootstrap_guttman_errors(data_trimmed)
+# results run and saved to disk, as execution time is about 2 minutes
+
+# NOTE THAT THE SELECT CALL MUST ORDER THE COLUMNS IN ASCENDING ORDER OF MEAN AWARENESS EXCLUSION RATE, AS TAKEN FROM THE ABOVE PRINTED TABLE, FOR THE ANALYSIS TO BE RUN APPROPRIATELY
+
+# results_guttman_errors <- data_processed %>%
+#   select(exclude_aware_olsen_and_fazio,
+#          exclude_awareness_baranan_dehouwer_nosek_modified,
+#          exclude_aware_olsen_and_fazio_modified,
+#          exclude_awareness_baranan_dehouwer_nosek) %>%
+#   bootstrap_guttman_errors()
+#  
 # save(results_guttman_errors, file = "models/results_guttman_errors.RData")
 load("models/results_guttman_errors.RData")
 
 # print
 results_guttman_errors %>%
   round_df(3) %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
-
-```
-
-## Rates by criterion 
-
-```{r}
-
-data_processed %>%
-  select(-DV, -data_collection_site) %>%
-  summarize_all(.funs = mean) %>%
-  round_df(3) %>%
-  gather() %>%
   kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
 
