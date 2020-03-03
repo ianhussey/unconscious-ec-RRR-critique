@@ -439,8 +439,8 @@ forest(fit_awareness_rate_of,
        addcred = TRUE,
        refline = NULL,
        xlab = "Proportion of aware participants")
-text(-0.5, 14, "Olson & Fazio (2001) exclusions", pos = 4)
-text(0.7, 13.85, "Proportion [95% CI]", pos = 2)
+text(-1, 14, "Olson & Fazio (2001) exclusions", pos = 4)
+text(1.5, 13.85, "Proportion [95% CI]", pos = 2)
 
 ```
 
