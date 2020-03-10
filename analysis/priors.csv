@@ -1,0 +1,3 @@
+﻿prior_intercept,real_effect,null_effect
+Good estimation,"normal(mean = 0.20, sd = 0.05)","normal(mean = 0.00, sd = 0.05)"
+Poor estimation,"normal(mean = 0.20, sd = 1.00)","normal(mean = 0.00, sd = 1.00)"

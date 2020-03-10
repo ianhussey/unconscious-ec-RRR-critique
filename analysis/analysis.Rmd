@@ -1,6 +1,6 @@
 ---
-title: "Unconscious EC RRR"
-subtitle: "Critical analysis"
+title: "Evaluative Conditioning without awareness: Replicable effects do not equate replicable inferences"
+subtitle: "Analyses"
 author: "Ian Hussey^[Ghent University. Email: ian.hussey@ugent.be]"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
@@ -49,9 +49,12 @@ library(tidyverse)
 library(metafor)
 library(knitr)
 library(kableExtra)
-library(patchwork)
 library(BayesFactor)
 library(broom)
+library(patchwork)
+
+# print versions of packages used, R version, OS details.
+writeLines(capture.output(sessionInfo()), "session_info.txt")
 
 
 # Data ----
@@ -524,19 +527,9 @@ text(1.5, 13.85, "Proportion [95% CI]", pos = 2)
 
 For each awareness criterion, the proportion of participants at each site that were labelled as demonstrating awareness was calculated and subjected to a meta analysis of proprortion. Results suggested that the variation in exclusion rates between sites represented a large degree of between-site heterogeneity rather than merely sampling variation (across exclusion criteria, all I2 = 54.7% to 91.7%, all H2 = 2.2 to 12). This may suggest that the awareness exclusion criteria were not functioning equivalently as measures of awareness between sites. This seems plausible given that participants' open ended responses were hand scored by researchers, making scores far from objective. 
 
-# EC effect using compound exclusion criterion
+# New meta analysis: EC effect using compound exclusion criterion
 
-The key verbal hypothesis being tested here is whether participants can demonstrate a change in liking due to the pairing of stimuli (i.e., EC), when those pairing occur without awareness. 
-
-Given that EC is uncontroversially known to occur within awareness, the test of this hypothesis relies on the successful exclusion of participants demonstating awareness. Should we fail to exclude individuals who are in fact aware, a traditional EC effect may be demonstrated at the group level, driven by those aware participants.  
-
-The analyses above suggest that the four awareness criteria used in the original RRR are noisey measures of awareness - both between criteria and between data collection sites. Furthermore, the criterion used for the "confirmatory" analysis within the RRR was the laxest criterion, excluding only XX% of participants where others excluded up to XX%. It is therefore notable that a significant effect was found only when using this lax criterion. We suggest that there is great risk that this effect was driven by the subset of participants who were scored as unaware but who in fact were aware.
-
-We therefore suggest a minor modification of the original analysis that provides a severe test of the verbal hypothesis: that particiapnts be scored as aware if *any* of the four criteria flag them as aware, and excluded from the meta analysis.
-
-Before conduciting such an analysis, it is useful to first consider what power such an analysis would have given an increased exclusion rate. 
-
-Using data at hand after combined exclusions, what effect size can be detected?
+We provide a more severe test of the verbal hypothesis: participants are scored as aware if *any* of the four criteria flag them as aware and excluded from the meta analysis.
 
 ```{r}
 
@@ -556,9 +549,13 @@ N after combined exclusions = `r n_participants`, k sites = `r k_sites`.
 
 ## Power analyses
 
+Before conducting such an analysis, it is useful to first consider what power such an analysis would have given an increased exclusion rate. 
+
 ### Method reported in manuscript 
 
-"within subjects [t test], one-tailed, alpha = 0.05)"
+For the sake of a like-for-like comparison, it is useful to report power calculations using the same method as reported in Moral et al.
+
+From the manuscript, this was a power analysis for a (fixed effects model) Cohen's *d*: "within subjects [t test], one-tailed, alpha = 0.05)"
 
 ```{r eval=FALSE, include=TRUE}
 
@@ -588,17 +585,17 @@ pwr.t.test(d = 0.10,    # CHANGED
 
 ```
 
-- At d = .20, the meta effect size from published literature, >99% power to detect this effect
-- At 99% power criterion, detectable d = .16 
-- At 80% power criterion, detectable d = .10
+- At *d* = .20, the meta effect size from published literature, >99% power to detect this effect
+- At 99% power criterion, detectable *d* = .16 
+- At 80% power criterion, detectable *d* = .10
 
-While I report this method for the sake of parity with the method reported in Moran et al., I disagree with several aspects of this analysis. First, statistical power is a property of a given hypothesis test method, and the test used in both Moran et al and here is meta analytic effect size (i.e., which involves a random effect for site). This power analysis does not involve this random effect - ie it is a power analysis for a different test, and it is unclear the degree to which it is informative for the hypothesis test that was actually run, both in Moran et al. and here. Even putting this aside, other issues are also apparently present: 1) the power analysis employed in Moran et al was stated to be a within subjects effect size, but the study design actually used a one-sample test; 2) the power analysis was stated to be one-sided with alpha = 0.05, but the hypothesis test uses two-sided with alpha = 0.05 (i.e., equivalent to one-sided with alpha = 0.10). In light of these issues, I also conducted what appeared to be a more appropriate power analysis, below.
+While I report this method for the sake of parity with the method reported in Moran et al., I disagree with several aspects of this analysis. First, statistical power is a property of a given hypothesis test method, and the test used in both Moran et al and here is meta analytic effect size (i.e., which involves a random effect for site). This power analysis does not involve this random effect - it is a power analysis for a different test, and it is unclear the degree to which it is informative for the hypothesis test that was actually run, both in Moran et al. and here. Even putting this aside, other issues are also apparently present: 1) the power analysis employed in Moran et al was stated to be a within subjects effect size, but the study design actually used a one-sample test; 2) the power analysis was stated to be one-sided with alpha = 0.05, but the hypothesis test uses two-sided with alpha = 0.05 (i.e., equivalent to one-sided with alpha = 0.10). In light of these issues, I also conducted what appeared to be a more appropriate power analysis below.
 
 ### For multi-level model
 
-In addition, we also considered a different form of power analysis that acknowledged the hierarchical structure among the data given the multi-site design. 
+This analysis acknowledges the hierarchical structure among the data given the multi-site design. 
 
-Heterogeneity tau2 set to 0 given results from preregistered meta analyses using other exclusion criteria. Alpha = 0.05, two-sided.
+Heterogeneity ($\tau^{2}$) set to 0 given (a) all sites used standardized materials (a priori) and (b) results from preregistered meta analyses using other exclusion criteria demonstrated no heterogeneity (somewhat post hoc, but still useful to know). $\alpha$ = 0.05, two-sided.
 
 ```{r eval=FALSE, include=TRUE}
 
@@ -624,9 +621,9 @@ power_meta(yi = 0.16,
 
 ```
 
-- At d = .20, the meta effect size from published literature, 95% power to detect this effect
-- At 99% power criterion, detectable meta d = .24
-- At 80% power criterion, detectable meta d = .16
+- At *d* = .20, the meta effect size from published literature, 95% power to detect this effect
+- At 99% power criterion, detectable meta *d* = .24
+- At 80% power criterion, detectable meta *d* = .16
 
 ## Frequentist meta-analysis
 
@@ -641,7 +638,7 @@ results_combined_criteria <- meta_analysis_workflow(data_combined_criteria)
 
 ## Bayes factor meta-analysis
 
-First calculate t values for each site, then use the meta BF function to calculate a meta analysis BF.
+Using Rouder and Morey (2011) method: First calculate t values for each site, then use the "meta.ttestBF" function to calculate a meta analysis BF.
 
 ```{r}
 
@@ -680,50 +677,4 @@ meta_bf_samples %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
 
 ```
-
-# EC effect when site awareness rate is controlled to zero
-
-We conducted a meta analysis to test the idea that the presence of EC effects was driven by participants in the sample who were actually aware, who were not excluded due to the lax and somewhat subjective awareness criterion.
-
-This model employed all participants, both aware and unaware (i.e., N = `r nrow(data_processed)`. Effect sizes were again calculated for each site, as well as the awareness rate. 
-
-```{r}
-
-data_moderator_meta <- data_processed %>% 
-  group_by(data_collection_site) %>%
-  dplyr::summarize(preference_mean = mean(DV),
-                   preference_sd = sd(DV),
-                   preference_n = n()) %>%
-  # must have greater than N=2 per site to calculate SD etc
-  filter(preference_n > 2) %>%
-  # calculate h and its SE
-  dplyr::mutate(preference_cohens_dz = preference_mean/preference_sd,
-                cohens_dz_V = ((preference_n*2)/(preference_n^2)) +
-                  ((preference_cohens_dz^2) / (preference_n*4)),
-                J = 1 - (3/(4*(preference_n-1)-1)),
-                hedges_g = preference_cohens_dz * J,
-                hedges_g_V = J^2 * cohens_dz_V,
-                hedges_g_se = sqrt(hedges_g_V)) %>%
-  ungroup() %>%
-  left_join(exclusion_rate_by_site, by = "data_collection_site") %>%
-  dplyr::select(data_collection_site, hedges_g, hedges_g_se, exclude_all_four_combined) %>%  
-  arrange(desc(exclude_all_four_combined))
-
-fit_moderator <- 
-  rma(yi   = hedges_g, 
-      sei  = hedges_g_se,
-      mod  = ~exclude_all_four_combined,
-      data = data_moderator_meta,
-      slab = data_collection_site)
-
-forest(fit_moderator,
-       ilab = round(data_moderator_meta$exclude_all_four_combined, 2)*100,
-       ilab.xpos = 1.3,
-       ilab.pos = 2)
-
-summary(fit_moderator)
-
-```
-
-Results demonstrated that the model intercept - i.e., the estimate of the EC effect if awareness rates in the sample were statistically controlled for to 0 - was Hedges' g = -0.02, 95% CI [-0.35, 0.31]. That is, when including aware participants in the sample but controlling for the rate of awareness between sites, the meta effect size estimate remained to be non-significant and close to zero. These results support the idea that (1) the observed heterogeneity in awareness rates between sites may be due to the somewhat subject nature of the awareness scoring criteria, and therefore (2) the presence of significant meta effect size in the original confirmatory analysis was due to the failure of this criteria to strictly exclude aware participants.
 
