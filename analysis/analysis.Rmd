@@ -53,13 +53,24 @@ library(BayesFactor)
 library(broom)
 library(patchwork)
 
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
+}
+
 # print versions of packages used, R version, OS details.
 writeLines(capture.output(sessionInfo()), "session_info.txt")
 
 
-# Data ----
+# data ----
 
-data_processed <- read.csv("../../unconscious-ec-RRR/data/processed/data_processed.csv") %>%
+# # read data from the main project's folder
+# data_from_rrr <- read.csv("../../unconscious-ec-RRR/data/processed/data_processed.csv")
+# # write to disk for this project
+# write_csv(data_from_rrr, "../data/data_from_rrr.csv")
+
+data_processed <- read.csv("../data/data_from_rrr.csv") %>%
   mutate(data_collection_site = dplyr::recode(data_collection_site,
                                               "Balas and Sarzynnska" = "Balas",
                                               "Corneille and Mierop" = "Mierop",
@@ -90,8 +101,7 @@ data_processed <- read.csv("../../unconscious-ec-RRR/data/processed/data_process
                 exclude_aware_olsen_and_fazio_modified,
                 exclude_awareness_baranan_dehouwer_nosek,
                 exclude_awareness_baranan_dehouwer_nosek_modified,
-                exclude_all_four_combined)
-  
+                exclude_all_four_combined) 
 
 data_combined_criteria <- data_processed %>%
   filter(exclude_all_four_combined == FALSE)
@@ -318,7 +328,7 @@ Awareness exclusion rates after doing surveillance exclusions.
 ```{r}
 
 data_processed %>%
-  select(exclude_aware_olsen_and_fazio, 
+  dplyr::select(exclude_aware_olsen_and_fazio, 
          exclude_aware_olsen_and_fazio_modified, 
          exclude_awareness_baranan_dehouwer_nosek, 
          exclude_awareness_baranan_dehouwer_nosek_modified,
@@ -361,7 +371,7 @@ As such, the most severe test of the hypothesis that EC can occur in the absence
 # NOTE THAT THE SELECT CALL MUST ORDER THE COLUMNS IN ASCENDING ORDER OF MEAN AWARENESS EXCLUSION RATE, AS TAKEN FROM THE ABOVE PRINTED TABLE, FOR THE ANALYSIS TO BE RUN APPROPRIATELY
 
 # results_guttman_errors <- data_processed %>%
-#   select(exclude_aware_olsen_and_fazio,
+#   dplyr::select(exclude_aware_olsen_and_fazio,
 #          exclude_awareness_baranan_dehouwer_nosek_modified,
 #          exclude_aware_olsen_and_fazio_modified,
 #          exclude_awareness_baranan_dehouwer_nosek) %>%
@@ -383,7 +393,7 @@ results_guttman_errors %>%
 ```{r}
 
 # data_processed %>%
-#   select(-DV) %>%
+#   dplyr::select(-DV) %>%
 #   group_by(data_collection_site) %>%
 #   summarize_all(.funs = mean) %>%
 #   round_df(3) %>%
@@ -534,7 +544,7 @@ We provide a more severe test of the verbal hypothesis: participants are scored 
 ```{r}
 
 n_participants <- data_combined_criteria %>%
-  select(DV, data_collection_site) %>%
+  dplyr::select(DV, data_collection_site) %>%
   count() %>%
   pull(n)
 
@@ -643,7 +653,7 @@ Using Rouder and Morey (2011) method: First calculate t values for each site, th
 ```{r}
 
 results_ttests <- data_combined_criteria %>% 
-  select(data_collection_site, DV) %>%
+  dplyr::select(data_collection_site, DV) %>%
   group_by(data_collection_site) %>%
   do(ttest = tidy(t.test(.$DV))) %>%
   unnest(ttest) %>%
