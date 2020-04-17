@@ -83,7 +83,20 @@ data_processed <- read.csv("../data/data_from_rrr.csv") %>%
                                               "Smith and Douglas" = "Douglas",
                                               "Stahl Bading Aust Heycke and Thomasius" = "Stahl",
                                               "Unkelbach and Hogden" = "Unkelbach",
-                                              "Vadillo" = "Vadillo")) %>%
+                                              "Vadillo" = "Vadillo"),
+         data_collection_site = fct_relevel(data_collection_site,
+                                            "Balas",
+                                            "Douglas",
+                                            "Gast",
+                                            "Gawronski",
+                                            "Hütter",
+                                            "Kurdi",
+                                            "Mierop",
+                                            "Moran",
+                                            "Olson",
+                                            "Stahl",
+                                            "Unkelbach",
+                                            "Vadillo")) %>%
   filter(exclude_surveillance == FALSE & 
            simulated_data == FALSE) %>%
   mutate(exclude_all_four_combined = ifelse(exclude_aware_olsen_and_fazio +
