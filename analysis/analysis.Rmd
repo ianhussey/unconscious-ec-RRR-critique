@@ -654,6 +654,8 @@ power_meta(yi = 0.16,
 
 results_combined_criteria <- meta_analysis_workflow(data_combined_criteria)
 
+write_rds(results_combined_criteria, "models/results_combined_criteria.rds")
+
 ```
 
 - Meta anaysis results: `r results_combined_criteria$meta_analysis_results_text`
