@@ -1,0 +1,204 @@
+---
+title: "Evaluative Conditioning without awareness: Replicable effects do not equate replicable inferences"
+subtitle: "Analyses"
+author: "Ian Hussey^[Ghent University. Email: ian.hussey@ugent.be]"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: haddock
+    number_sections: no
+    theme: flatly
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+
+# options
+options(knitr.table.format = "html") # necessary configuration of tables
+
+# disable scientific notation
+options(scipen = 999) 
+
+```
+
+# Data, dependencies & functions
+
+```{r}
+
+# Dependencies ----
+
+check_for_and_install_packages <- function(package) {
+  if (!package %in% installed.packages()) install.packages(package)
+}
+
+check_for_and_install_packages("tidyverse")
+check_for_and_install_packages("metafor")
+check_for_and_install_packages("knitr")
+check_for_and_install_packages("kableExtra")
+check_for_and_install_packages("BayesFactor")
+check_for_and_install_packages("broom")
+if (!"patchwork" %in% installed.packages()) devtools::install_github("thomasp85/patchwork")
+
+library(tidyverse)
+library(metafor)
+library(knitr)
+library(kableExtra)
+library(BayesFactor)
+library(broom)
+library(patchwork)
+
+# data ----
+
+# # read data from the main project's folder
+# data_from_rrr <- read.csv("../../unconscious-ec-RRR/data/processed/data_processed.csv")
+# # write to disk for this project
+# write_csv(data_from_rrr, "../data/data_from_rrr.csv")
+
+data_processed <- read.csv("../data/data_from_rrr.csv") %>%
+  mutate(data_collection_site = dplyr::recode(data_collection_site,
+                                              "Balas and Sarzynnska" = "Balas",
+                                              "Corneille and Mierop" = "Mierop",
+                                              "Gast Richter and Benedict" = "Gast",
+                                              "Gawronski" = "Gawronski",
+                                              "Hutter" = "Hütter",
+                                              "Kurdi and Ferguson" = "Kurdi",
+                                              "Moran Hussey and Hughes" = "Moran",
+                                              "Olsen and Fritzlen" = "Olson",
+                                              "Smith and Douglas" = "Douglas",
+                                              "Stahl Bading Aust Heycke and Thomasius" = "Stahl",
+                                              "Unkelbach and Hogden" = "Unkelbach",
+                                              "Vadillo" = "Vadillo"),
+         data_collection_site = fct_relevel(data_collection_site,
+                                            "Balas",
+                                            "Douglas",
+                                            "Gast",
+                                            "Gawronski",
+                                            "Hütter",
+                                            "Kurdi",
+                                            "Mierop",
+                                            "Moran",
+                                            "Olson",
+                                            "Stahl",
+                                            "Unkelbach",
+                                            "Vadillo")) %>%
+  filter(exclude_surveillance == FALSE & 
+           simulated_data == FALSE) %>%
+  mutate(exclude_all_four_combined = ifelse(exclude_aware_olsen_and_fazio +
+                                              exclude_aware_olsen_and_fazio_modified +
+                                              exclude_awareness_baranan_dehouwer_nosek +
+                                              exclude_awareness_baranan_dehouwer_nosek_modified > 0, 1, 0)) %>%
+  rename(DV = sum_score_evaluation_CSpos_preferred) %>%
+  mutate(DV_uninverted = ifelse(condition == "CS1_USneg", DV*-1,
+                                ifelse(condition == "CS1_USpos", DV, NA))) %>%
+  dplyr::select(data_collection_site,
+                DV,
+                DV_uninverted,
+                condition,
+                exclude_aware_olsen_and_fazio,
+                exclude_aware_olsen_and_fazio_modified,
+                exclude_awareness_baranan_dehouwer_nosek,
+                exclude_awareness_baranan_dehouwer_nosek_modified,
+                exclude_all_four_combined) 
+
+data_combined_criteria <- data_processed %>%
+  filter(exclude_all_four_combined == FALSE)
+
+
+# Define functions ----
+
+
+
+# add heterogeneity metrics to metafor forest plot
+add_heterogeneity_metrics_to_forest <- function(fit) {
+  bquote(paste("RE Model (", 
+               italic('I')^"2", " = ", .(formatC(format(round(fit$I2, 1), nsmall = 1))),
+               "%, ", italic('H')^"2", " = ", .(formatC(format(round(fit$H2, 1), nsmall = 1))), ")"))
+}
+
+# function to round all numerics in a data frame
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
+}
+
+# apa format p value
+apa_p_value <- function(p){
+  p_formatted <- ifelse(p >= 0.001, paste("=", round(p, 3)),
+                        ifelse(p < 0.001, "< .001", NA))
+  p_formatted <- gsub(pattern = "0.", replacement = ".", x = p_formatted, fixed = TRUE)
+  p_formatted
+}
+
+```
+
+# New meta analysis: EC effect using compound exclusion criterion
+
+We provide a more severe test of the verbal hypothesis: participants are scored as aware if *any* of the four criteria flag them as aware and excluded from the meta analysis.
+
+```{r}
+
+n_participants <- data_combined_criteria %>%
+  dplyr::select(DV, data_collection_site) %>%
+  count() %>%
+  pull(n)
+
+k_sites <- data_combined_criteria %>%
+  distinct(data_collection_site) %>%
+  count() %>%
+  pull(n)
+
+```
+
+N after combined exclusions = `r n_participants`, k sites = `r k_sites`.
+
+## Bayes factor meta-analysis
+
+Using Rouder and Morey (2011) method: First calculate t values for each site, then use the "meta.ttestBF" function to calculate a meta analysis BF.
+
+Following a reviewer suggestion, we have included a BF meta analysis with a scaling factor of 0.2/7 on the basis that "As the uncorrected meta-analysis gave an effect of 0.2, 0.2 is a maximum. The rough maximum for a Cauchy is 7 scale factors out (in the sense that 5% of the area is beyond this). So an appropriate scale factor would be 0.2/7."
+
+```{r}
+
+results_ttests <- data_combined_criteria %>% 
+  dplyr::select(data_collection_site, DV) %>%
+  group_by(data_collection_site) %>%
+  do(ttest = tidy(t.test(.$DV))) %>%
+  unnest(ttest) %>%
+  rename(t = statistic, 
+         df = parameter) %>%
+  mutate(n = df + 1)
+
+meta_bf <-
+  meta.ttestBF(t = results_ttests$t,
+             n1 = results_ttests$n,
+             rscale = 0.2/7)
+
+meta_bf_samples <-
+  meta.ttestBF(t = results_ttests$t,
+               n1 = results_ttests$n,
+               rscale = 0.2/7,
+               posterior = TRUE,
+               iterations = 10000)
+
+bf10 <- data.frame(key = "BF10", value = extractBF(meta_bf)$bf)
+
+meta_bf_samples %>%
+  as.data.frame() %>%
+  dplyr::summarize(delta_estimate = quantile(delta, 0.500),
+                   hdi_lower      = quantile(delta, 0.025),
+                   hdi_upper      = quantile(delta, 0.975)) %>%
+  gather() %>%
+  bind_rows(bf10) %>%
+  round_df(2) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
+

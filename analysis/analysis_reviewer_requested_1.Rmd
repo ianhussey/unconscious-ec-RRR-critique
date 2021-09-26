@@ -1,0 +1,432 @@
+---
+title: "Evaluative Conditioning without awareness: Replicable effects do not equate replicable inferences"
+subtitle: "Analyses"
+author: "Ian Hussey^[Ghent University. Email: ian.hussey@ugent.be]"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: haddock
+    number_sections: no
+    theme: flatly
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+
+# options
+options(knitr.table.format = "html") # necessary configuration of tables
+
+# disable scientific notation
+options(scipen = 999) 
+
+```
+
+# Data, dependencies & functions
+
+```{r}
+
+# Dependencies ----
+
+check_for_and_install_packages <- function(package) {
+  if (!package %in% installed.packages()) install.packages(package)
+}
+
+check_for_and_install_packages("tidyverse")
+check_for_and_install_packages("metafor")
+check_for_and_install_packages("knitr")
+check_for_and_install_packages("kableExtra")
+check_for_and_install_packages("BayesFactor")
+check_for_and_install_packages("broom")
+if (!"patchwork" %in% installed.packages()) devtools::install_github("thomasp85/patchwork")
+
+library(tidyverse)
+library(metafor)
+library(knitr)
+library(kableExtra)
+library(BayesFactor)
+library(broom)
+library(patchwork)
+
+# # print versions of packages used, R version, OS details.
+# writeLines(capture.output(sessionInfo()), "session_info.txt")
+
+
+# data ----
+
+# # read data from the main project's folder
+# data_from_rrr <- read.csv("../../unconscious-ec-RRR/data/processed/data_processed.csv")
+# # write to disk for this project
+# write_csv(data_from_rrr, "../data/data_from_rrr.csv")
+
+data_processed <- read.csv("../data/data_from_rrr.csv") %>%
+  mutate(data_collection_site = dplyr::recode(data_collection_site,
+                                              "Balas and Sarzynnska" = "Balas",
+                                              "Corneille and Mierop" = "Mierop",
+                                              "Gast Richter and Benedict" = "Gast",
+                                              "Gawronski" = "Gawronski",
+                                              "Hutter" = "Hütter",
+                                              "Kurdi and Ferguson" = "Kurdi",
+                                              "Moran Hussey and Hughes" = "Moran",
+                                              "Olsen and Fritzlen" = "Olson",
+                                              "Smith and Douglas" = "Douglas",
+                                              "Stahl Bading Aust Heycke and Thomasius" = "Stahl",
+                                              "Unkelbach and Hogden" = "Unkelbach",
+                                              "Vadillo" = "Vadillo"),
+         data_collection_site = fct_relevel(data_collection_site,
+                                            "Balas",
+                                            "Douglas",
+                                            "Gast",
+                                            "Gawronski",
+                                            "Hütter",
+                                            "Kurdi",
+                                            "Mierop",
+                                            "Moran",
+                                            "Olson",
+                                            "Stahl",
+                                            "Unkelbach",
+                                            "Vadillo")) %>%
+  filter(exclude_surveillance == FALSE & 
+           simulated_data == FALSE) %>%
+  mutate(exclude_combined_any_sensitive = ifelse(exclude_aware_olsen_and_fazio +
+                                                   exclude_aware_olsen_and_fazio_modified +
+                                                   exclude_awareness_baranan_dehouwer_nosek +
+                                                   exclude_awareness_baranan_dehouwer_nosek_modified > 0, 1, 0),
+         exclude_combined_all_specific = ifelse(exclude_aware_olsen_and_fazio +
+                                                  exclude_aware_olsen_and_fazio_modified +
+                                                  exclude_awareness_baranan_dehouwer_nosek +
+                                                  exclude_awareness_baranan_dehouwer_nosek_modified == 4, 1, 0),
+         no_awareness_exclusions = 0) %>%
+  rename(DV = sum_score_evaluation_CSpos_preferred) %>%
+  mutate(DV_uninverted = ifelse(condition == "CS1_USneg", DV*-1,
+                                ifelse(condition == "CS1_USpos", DV, NA))) %>%
+  dplyr::select(data_collection_site,
+                DV,
+                DV_uninverted,
+                condition,
+                no_awareness_exclusions,
+                exclude_combined_all_specific,
+                exclude_aware_olsen_and_fazio,
+                exclude_aware_olsen_and_fazio_modified,
+                exclude_awareness_baranan_dehouwer_nosek,
+                exclude_awareness_baranan_dehouwer_nosek_modified,
+                exclude_combined_any_sensitive) 
+
+data_combined_criteria_any_sensitive <- data_processed %>%
+  filter(exclude_combined_any_sensitive == FALSE)
+
+data_combined_criteria_all_specific <- data_processed %>%
+  filter(exclude_combined_all_specific == FALSE)
+
+data_combined_criteria_none <- data_processed 
+
+
+# Define functions ----
+
+# add heterogeneity metrics to metafor forest plot
+add_heterogeneity_metrics_to_forest <- function(fit) {
+  bquote(paste("RE Model (", 
+               italic('I')^"2", " = ", .(formatC(format(round(fit$I2, 1), nsmall = 1))),
+               "%, ", italic('H')^"2", " = ", .(formatC(format(round(fit$H2, 1), nsmall = 1))), ")"))
+}
+
+# function to round all numerics in a data frame
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
+}
+
+# apa format p value
+apa_p_value <- function(p){
+  p_formatted <- ifelse(p >= 0.001, paste("=", round(p, 3)),
+                        ifelse(p < 0.001, "< .001", NA))
+  p_formatted <- gsub(pattern = "0.", replacement = ".", x = p_formatted, fixed = TRUE)
+  p_formatted
+}
+
+# meta analysis and forest plot workflow
+meta_analysis_workflow <- function(data, 
+                                   effect_size_label = "Hedges' g", 
+                                   reference_line = 0, 
+                                   plot = TRUE) {
+  
+  # calculate effect sizes for meta
+  # NB the original preregistered code used a bootstrapping method to calculate effect sizes, CIs, and SEIs. However, the unexpectedly small number of participants collected at some sites meant that results - particularly heterogeneity effect sizes - were relatively unstable across re-running the script. For the sake of computational reproducibility, I therefore exchange the bootstrapping method for the arithmetic method throughout. Sites with N <= 2 are then excluded so that ES can be calculated (see [link](https://www.meta-analysis.com/downloads/Meta-analysis%20Effect%20sizes%20based%20on%20means.pdf)).
+  data_effect_sizes <- data %>%
+    group_by(data_collection_site) %>%
+    dplyr::summarize(preference_mean = mean(DV),
+                     preference_sd = sd(DV),
+                     preference_n = n()) %>%
+    # must have greater than N=2 per site to calculate SD etc
+    filter(preference_n > 2) %>%
+    # calculate h and its SE
+    dplyr::mutate(preference_cohens_dz = preference_mean/preference_sd,
+                  cohens_dz_V = ((preference_n*2)/(preference_n^2)) +
+                    ((preference_cohens_dz^2) / (preference_n*4)),
+                  J = 1 - (3/(4*(preference_n-1)-1)),
+                  hedges_g = preference_cohens_dz * J,
+                  hedges_g_V = J^2 * cohens_dz_V,
+                  hedges_g_se = sqrt(hedges_g_V)) %>%
+    ungroup() %>%
+    dplyr::select(data_collection_site, hedges_g, hedges_g_se)
+  
+  # fit random effects model 
+  fitted_model <- 
+    rma(yi   = hedges_g, 
+        sei  = hedges_g_se,
+        data = data_effect_sizes,
+        slab = data_collection_site)
+  
+  p_value <- apa_p_value(fitted_model$pval)
+  
+  z_value <- fitted_model$zval
+  
+  # model predictions
+  meta_analysis_results <-
+    predict(fitted_model, digits = 5) %>%
+    as.data.frame() %>%
+    gather() %>%
+    #round_df(2) %>%
+    dplyr::rename(metric = key,
+                  estimate = value) %>%
+    mutate(metric = dplyr::recode(metric,
+                                  "pred"  = paste("Meta analysed ", effect_size_label),
+                                  "ci.lb" = "95% CI lower",
+                                  "ci.ub" = "95% CI upper",
+                                  "cr.lb" = "95% CR lower",
+                                  "cr.ub" = "95% CR upper"))
+  
+  meta_analysis_results <- rbind(meta_analysis_results,
+                                 data.frame(metric = "p", estimate = p_value),
+                                 data.frame(metric = "z", estimate = z_value))
+  
+  # summarize results
+  meta_analysis_results_text <- 
+    paste0("k = ", fitted_model$k, ", ", 
+           effect_size_label, " = ", meta_analysis_results$estimate[1],
+           # dynamic indexing of some values as different models return variables in different locations, but relative location is reliable
+           ", 95% CI = [", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-5],  
+           ", ", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-4], 
+           "], 95% CR = [", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-3], 
+           ", ", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-2],
+           "], z = ", signif(as.numeric(as.character(meta_analysis_results$estimate[length(meta_analysis_results$estimate)])), digits = 3),
+           ", p ", meta_analysis_results$estimate[length(meta_analysis_results$estimate)-1])
+  
+  heterogeneity_test_results_text <- 
+    paste0("Q(df = ",    fitted_model$k - 1, ") = ", round(fitted_model$QE, 2), 
+           ", p ",       apa_p_value(fitted_model$QEp),
+           ", tau^2 = ", round(fitted_model$tau2, 2), 
+           ", I^2 = ",   round(fitted_model$I2, 2),
+           ", H^2 = ",   round(fitted_model$H2, 2))
+  
+  # forest plot 
+  if (plot == TRUE) {
+    forest_plot <- metafor::forest(fitted_model,
+                                   xlab = effect_size_label,
+                                   addcred = TRUE,
+                                   refline = reference_line)
+  } else {
+    forest_plot <- NULL
+  }
+  
+  return(list(data_effect_sizes               = data_effect_sizes,
+              fitted_model                    = fitted_model, 
+              meta_analysis_results           = meta_analysis_results,
+              meta_analysis_results_text      = meta_analysis_results_text,
+              heterogeneity_test_results_text = heterogeneity_test_results_text,
+              plot                            = plot))
+  
+}
+
+```
+
+# Exclusion rate by criterion 
+
+```{r}
+
+exclusion_rates <-
+  data_processed %>%
+  dplyr::select(None = no_awareness_exclusions,
+                All = exclude_combined_all_specific,
+                OF = exclude_aware_olsen_and_fazio, 
+                OF_M = exclude_aware_olsen_and_fazio_modified, 
+                BANDH = exclude_awareness_baranan_dehouwer_nosek, 
+                BANDH_M = exclude_awareness_baranan_dehouwer_nosek_modified,
+                Any = exclude_combined_any_sensitive) %>%
+  summarize_all(.funs = mean) %>%
+  round_df(3) %>%
+  gather() %>%
+  rename(proportion = value) %>%
+  arrange(proportion) 
+
+exclusion_rates %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
+
+# Meta analyses using different exclusion criteria
+
+## None (no control on awareness, least severe test of hypothesis)
+
+```{r}
+
+results_no_awareness_exclusions <- meta_analysis_workflow(data_combined_criteria_none, plot = FALSE)
+
+```
+
+## All (prioritizes specificity, second least severe test of hypothesis)
+
+```{r}
+
+results_all <- meta_analysis_workflow(data_combined_criteria_all_specific, plot = FALSE)
+
+```
+
+## Moran et al's four seperate criteria (moderately severe tests of hypothesis, depending on criterion)
+
+NB analyses ordered by percent of participants excluded by criterion
+
+### O&F
+
+```{r}
+
+results_of <- data_processed %>%
+  filter(exclude_aware_olsen_and_fazio == 0) %>%
+  meta_analysis_workflow(plot = FALSE)
+
+```
+
+### BA, N, & DH mod
+
+```{r}
+
+results_bandh_mod <- data_processed %>%
+  filter(exclude_awareness_baranan_dehouwer_nosek_modified == 0) %>%
+  meta_analysis_workflow(plot = FALSE)
+
+```
+
+### O&F mod
+
+```{r}
+
+results_of_mod <- data_processed %>%
+  filter(exclude_aware_olsen_and_fazio_modified == 0) %>%
+  meta_analysis_workflow(plot = FALSE)
+
+```
+
+### BA, N, & DH
+
+```{r}
+
+results_bandh <- data_processed %>%
+  filter(exclude_awareness_baranan_dehouwer_nosek == 0) %>%
+  meta_analysis_workflow(plot = FALSE)
+
+```
+
+## Any (prioritizes sensitivity, most severe test of hypothesis)
+
+```{r}
+
+results_any <- meta_analysis_workflow(data_combined_criteria_any_sensitive, plot = FALSE)
+
+```
+
+# Combined results with inferences
+
+```{r}
+
+results_combined <- 
+  tibble(
+    awareness_exclusion_criterion = c("None (does not test unaware EC hypothesis)", 
+                                      "Compound: Aware on ALL criteria (prioritizes specificity, least severe test of hypothesis)", 
+                                      "Olsen & Fazio", 
+                                      "Bar-Anan, Nosek & De Houwer",
+                                      "Olsen & Fazio modified", 
+                                      "Bar-Anan, Nosek & De Houwer modified",
+                                      "Compound: Aware on ANY criterion (prioritizes sensitivity, most severe test of hypothesis)"),
+    awareness_exclusion_criterion_simple = c("None (does not test unaware EC hypothesis)", 
+                                             "Aware on ALL criteria (least severe test of hypothesis)", 
+                                             "Olsen & Fazio", 
+                                             "Bar-Anan, Nosek & De Houwer",
+                                             "Olsen & Fazio modified", 
+                                             "Bar-Anan, Nosek & De Houwer modified",
+                                             "Aware on ANY criterion (most severe test of hypothesis)"),
+    proportion_excluded_as_aware = exclusion_rates$proportion,
+    hedges_g = as.numeric(c(results_no_awareness_exclusions$meta_analysis_results$estimate[1],
+                            results_all$meta_analysis_results$estimate[1],
+                            results_of$meta_analysis_results$estimate[1],
+                            results_bandh_mod$meta_analysis_results$estimate[1],
+                            results_of_mod$meta_analysis_results$estimate[1],
+                            results_bandh$meta_analysis_results$estimate[1],
+                            results_any$meta_analysis_results$estimate[1])),
+    ci_lower = as.numeric(c(results_no_awareness_exclusions$meta_analysis_results$estimate[3],
+                            results_all$meta_analysis_results$estimate[3],
+                            results_of$meta_analysis_results$estimate[3],
+                            results_bandh_mod$meta_analysis_results$estimate[3],
+                            results_of_mod$meta_analysis_results$estimate[3],
+                            results_bandh$meta_analysis_results$estimate[3],
+                            results_any$meta_analysis_results$estimate[3])),
+    ci_upper = as.numeric(c(results_no_awareness_exclusions$meta_analysis_results$estimate[4],
+                            results_all$meta_analysis_results$estimate[4],
+                            results_of$meta_analysis_results$estimate[4],
+                            results_bandh_mod$meta_analysis_results$estimate[4],
+                            results_of_mod$meta_analysis_results$estimate[4],
+                            results_bandh$meta_analysis_results$estimate[4],
+                            results_any$meta_analysis_results$estimate[4])),
+  ) %>%
+  mutate(awareness_exclusion_criterion_simple = fct_reorder(awareness_exclusion_criterion_simple,
+                                                            proportion_excluded_as_aware,
+                                                            .desc = TRUE))
+
+```
+
+The most severe test of the hypothesis that EC effects can occur in the absence of awareness is to use an exclusion criterion that detects awareness with high sensitivity and excludes these participants. Moran et al used 4 different exclusions criteria. We combined them to create a compound criterion that flagged and excluded the participant as aware if they are scored as aware by ANY individual criterion. 
+
+To illustrate the differences between the criteria and their influence on a) the exclusion rate and b) the observed EC effect size, we also calculated two additional criteria: one in which no participants were excluded, and one compound criterion that flagged and excluded the participant as aware if they are scored as aware by ALL individual criterion. The former does not test the unaware EC hypothesis, and the latter provides an even weaker test of the unaware EC hypothesis than any of the individual criteria (and the compound ANY-criterion); however, the addition of these two allows us to observe a predicted pattern among the exclusion rates and the observed EC effect sizes: as the proportion of participants being excluded increases, the EC effect size should decrease (i.e., the test of the unaware EC effect becomes more severe).
+
+```{r}
+
+results_combined %>%
+  select(-awareness_exclusion_criterion_simple) %>%
+  mutate_if(is.numeric, round, 3) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+ggplot(results_combined, aes(awareness_exclusion_criterion_simple, hedges_g)) +
+  geom_linerange(aes(ymin = ci_lower, ymax = ci_upper)) +
+  geom_point() +
+  coord_flip() +
+  theme_bw() +
+  xlab("Awareness exclusion criterion") +
+  ylab("Hedges' g")
+
+```
+
+This relationship between exclusion rate and EC effect size can also be plotted as a scatter plot:
+
+```{r}
+
+ggplot(results_combined, aes(proportion_excluded_as_aware, hedges_g)) +
+  geom_linerange(aes(ymin = ci_lower, ymax = ci_upper)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_hline(aes(yintercept = 0), linetype = "dashed") +
+  theme_bw() +
+  xlab("Proportion excluded as aware") +
+  ylab("Hedges' g")
+
+```
+
+
+
+
